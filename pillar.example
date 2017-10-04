@@ -15,6 +15,7 @@ haproxy:
 
     user: haproxy
     group: haproxy
+    tunebufsize: 16384
     chroot:
       enable: True
       path: /var/lib/haproxy
