@@ -35,7 +35,7 @@ Currently, only a handful of options can be set using the pillar:
 
 - Global
 
-  + stats: enable stats, curently only via a unix socket which can be set to a path
+  + stats: enable stats, currently only via a unix socket which can be set to a path with custom permissions and optional extra bind arguments
   + user: sets the user haproxy shall run as
   + group: sets the group haproxy shall run as
   + chroot: allows you to turn on chroot and set a directory
@@ -55,9 +55,11 @@ Currently, only a handful of options can be set using the pillar:
 
   + name: the name haproxy will use for the frontend
   + bind: the bind string: this allows you to set the IP, Port and other paramters for the bind
+  + redirect: add a redirect line, an unparsed string like in the backend
   + reqadd: an array of reqadd statements. Looped over and put in the configuration, no parsing
   + default_backend: sets the default backend
   + acls: a list of acls, not parsed, simply looped and put in to the configuration
+  + blocks: a list of block statements, not parsed, simply looped and put in to the configuration
   + use_backends: a list of use_backend statements, looped over, not parsed
 
 - Backend; Backend(s) is a list of the backends you desire to have in your haproxy setup, per backend you can set:
@@ -72,6 +74,7 @@ Currently, only a handful of options can be set using the pillar:
     + port: the port to contact the server on
     + check: set to check to enable checking
 
+- For global, default, frontend, listener, backend and server it is possible to use the "extra" option for more rare settings not mentioned above.
 
 ``haproxy.service``
 -------------------
