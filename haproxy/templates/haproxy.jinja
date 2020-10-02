@@ -23,8 +23,20 @@
 # Global settings
 #------------------
 global
+{%- if salt['pillar.get']('haproxy:global:log', []) != [] %}
+{%- for log in salt['pillar.get']('haproxy:global:log') %}
+    log {{ log }}
+{%- endfor %}
+{%- else %}
     log /dev/log    local0
     log /dev/log    local1 notice
+{%- endif %}
+{%- if salt['pillar.get']('haproxy:global:log-tag') %}
+    log-tag {{ salt['pillar.get']('haproxy:global:log-tag', 'haproxy') }}
+{%- endif %}
+{%- if salt['pillar.get']('haproxy:global:log-send-hostname') %}
+    log-send-hostname {{ salt['pillar.get']('haproxy:global:log-send-hostname') }}
+{%- endif %}
     user {{ salt['pillar.get']('haproxy:global:user', 'haproxy') }}
     group {{ salt['pillar.get']('haproxy:global:group', 'haproxy') }}
     tune.bufsize {{ salt['pillar.get']('haproxy:global:tunebufsize', '16384') }}
@@ -35,7 +47,10 @@ global
     daemon
 {%- endif %}
 {%- if salt['pillar.get']('haproxy:global:stats:enable', 'no') == True %}
-    stats socket {{ salt['pillar.get']('haproxy:global:stats:socketpath', '/tmp/ha_stats.sock') }} level {{ salt['pillar.get']('haproxy:global:stats:level', 'operator') }}
+  {%- set socketpath = salt['pillar.get']('haproxy:global:stats:socketpath', '/tmp/ha_stats.sock') %}
+  {%- set mode = salt['pillar.get']('haproxy:global:stats:mode', '660') %}
+  {%- set level = salt['pillar.get']('haproxy:global:stats:level', 'operator') %}
+    stats socket {{ socketpath }} mode {{ mode }} level {{ level }}{% if 'extra' in salt['pillar.get']('haproxy:global:stats', {}) %} {{ salt['pillar.get']('haproxy:global:stats:extra') }}{% endif %}
 {%- endif %}
 {%- if 'maxconn' in salt['pillar.get']('haproxy:global', {}) %}
     maxconn {{ salt['pillar.get']('haproxy:global:maxconn') }}
@@ -64,6 +79,15 @@ global
 {%- if 'ssl-default-bind-options' in salt['pillar.get']('haproxy:global', {}) %}
     {{- render_list_of_dictionaries('ssl-default-bind-options', salt['pillar.get']('haproxy:global:ssl-default-bind-options')) }}
 {%- endif %}
+{%- if 'extra' in salt['pillar.get']('haproxy:global', {}) %}
+  {%- if salt['pillar.get']('haproxy:global:extra', {}) is string %}
+    {{ salt['pillar.get']('haproxy:global:extra') }}
+  {%- else %}
+    {%- for line in salt['pillar.get']('haproxy:global:extra') %}
+    {{ line }}
+    {%- endfor %}
+  {%- endif %}
+{%- endif %}
 
 {%- for id, userlist in salt['pillar.get']('haproxy:userlists',  {})|dictsort %}
 #------------------
@@ -90,13 +114,21 @@ userlist {{ id }}
 #------------------
 defaults
     log {{ salt['pillar.get']('haproxy:defaults:log', 'global') }}
+{%- if 'mode' in salt['pillar.get']('haproxy:defaults', {}) %}
     mode {{ salt['pillar.get']('haproxy:defaults:mode', 'http') }}
+{%- endif %}
+{%- if 'retries' in salt['pillar.get']('haproxy:defaults', {}) %}
     retries {{ salt['pillar.get']('haproxy:defaults:retries', '3') }}
+{%- endif %}
+{%- if 'balance' in salt['pillar.get']('haproxy:defaults', {}) %}
     balance {{ salt['pillar.get']('haproxy:defaults:balance', 'roundrobin') }}
-{%- if 'monitoruri' in salt['pillar.get']('haproxy:defaults', {}) -%}
+{%- endif %}
+{%- if 'monitoruri' in salt['pillar.get']('haproxy:defaults', {}) %}
     monitor-uri {{ salt['pillar.get']('haproxy:defaults:monitoruri') }}
 {%- endif %}
+{%- if 'hashtype' in salt['pillar.get']('haproxy:defaults', {}) %}
     hash-type {{ salt['pillar.get']('haproxy:defaults:hashtype', 'map-based') }}
+{%- endif %}
 {%- if 'options' in salt['pillar.get']('haproxy:defaults', {}) -%}
     {{- render_list_of_dictionaries('option', salt['pillar.get']('haproxy:defaults:options')) }}
 {%- endif %}
@@ -117,6 +149,15 @@ defaults
 {%- endif %}
 {%- if 'stats' in salt['pillar.get']('haproxy:defaults', {}) -%}
     {{ render_list_of_dictionaries('stats', salt['pillar.get']('haproxy:defaults:stats')) }}
+{%- endif %}
+{%- if 'extra' in salt['pillar.get']('haproxy:defaults', {}) %}
+  {%- if salt['pillar.get']('haproxy:defaults:extra', {}) is string %}
+    {{ salt['pillar.get']('haproxy:defaults:extra') }}
+  {%- else %}
+    {%- for line in salt['pillar.get']('haproxy:defaults:extra') %}
+    {{ line }}
+    {%- endfor %}
+  {%- endif %}
 {%- endif %}
 {%- if 'errorfiles' in salt['pillar.get']('haproxy:defaults', {}) %}
   {%- for errorfile_name, errorfile in salt['pillar.get']('haproxy:defaults:errorfiles')|dictsort %}
@@ -201,7 +242,7 @@ listen {{ listener.get('name', listener_name) }}
     {%- endif %}
     {%- if 'tcprequests' in listener %}
       {%- if listener.tcprequests is string %}
-    tcp-request {{ listner.tcprequests }}
+    tcp-request {{ listener.tcprequests }}
       {%- else %}
         {%- for tcprequest in listener.tcprequests %}
     tcp-request {{ tcprequest }}
@@ -229,6 +270,15 @@ listen {{ listener.get('name', listener_name) }}
     {%- if 'httpcheck' in listener %}
       {%- if listener.httpcheck is string %}
     http-check {{ listener.httpcheck }}
+      {%- endif %}
+    {%- endif %}
+    {%- if 'tcpchecks' in listener %}
+      {%- if listener.tcpchecks is string %}
+    tcp-check {{ listener.tcpchecks }}
+      {%- else %}
+        {%- for tcpcheck in listener.tcpchecks %}
+    tcp-check {{ tcpcheck }}
+        {%- endfor %}
       {%- endif %}
     {%- endif %}
     {%- if 'reqadds' in listener %}
@@ -276,6 +326,11 @@ listen {{ listener.get('name', listener_name) }}
     {%- if 'maxconn' in listener %}
     maxconn {{ listener.maxconn }}
     {%- endif %}
+    {%- if 'timeouts' in listener %}
+      {%- for timeout in listener.timeouts %}
+    timeout {{ timeout }}
+      {%- endfor %}
+    {%- endif %}
     {%- if 'options' in listener %}
       {%- if listener.options is string %}
     option {{ listener.options }}
@@ -304,12 +359,21 @@ listen {{ listener.get('name', listener_name) }}
     appsession {%- for option in listener.appsession %}  {{ option }}  {%- endfor %}
       {%- endif %}
     {%- endif %}
+    {%- if 'extra' in listener %}
+      {%- if listener.extra is string %}
+    {{ listener.extra }}
+      {%- else %}
+    {%- for line in listener.extra %}
+    {{ line }}  {%- endfor %}
+      {%- endif %}
+    {%- endif %}
     {%- if 'defaultserver' in listener %}
     default-server {%- for option, value in listener.defaultserver|dictsort %} {{ ' '.join((option, value|string, '')) }} {%- endfor %}
     {%- endif %}
     {%- if 'servers' in listener %}
       {%- for server_name, server in listener.servers|dictsort %}
-    server {{ server.get('name', server_name) }} {{ server.host }}:{{ server.port }} {{ server.check }} {{ server.get('extra', '') }}
+        {%- set name = server.get('name', server_name) %}
+    server {{ name }} {{ server.host }}{% if 'port' in server %}:{{ server.port }}{% endif %} {% if 'maxconn' in server %} maxconn {{ server.maxconn }}{% endif %} {{ server.get('check', '') }} {{ server.get('extra', '') }}
       {%- endfor %}
     {%- endif %}
   {% endfor %}
@@ -335,6 +399,11 @@ frontend {{ frontend.get('name', frontend_name) }}
     {%- endif %}
     {%- if 'maxconn' in frontend %}
     maxconn {{ frontend.maxconn }}
+    {%- endif %}
+    {%- if 'timeouts' in frontend %}
+      {%- for timeout in frontend.timeouts %}
+    timeout {{ timeout }}
+      {%- endfor %}
     {%- endif %}
     {%- if 'options' in frontend %}
     {{- render_list_of_dictionaries('option', frontend.options) }}
@@ -378,6 +447,9 @@ frontend {{ frontend.get('name', frontend_name) }}
     {%- if 'rspadds' in frontend %}
     {{- render_list_of_dictionaries('rspadd', frontend.rspadds) }}
     {%- endif %}
+    {%- if 'reqreps' in frontend %}
+    {{- render_list_of_dictionaries('reqrep', frontend.reqreps) }}
+    {%- endif %}
     {%- if 'reqadds' in frontend %}
     {{- render_list_of_dictionaries('reqadd', frontend.reqadds) }}
     {%- endif %}
@@ -386,6 +458,15 @@ frontend {{ frontend.get('name', frontend_name) }}
     {%- endif %}
     {%- if 'stickons' in frontend %}
     {{- render_list_of_dictionaries('stickon', frontend.stickons) }}
+    {%- endif %}
+    {%- if 'extra' in frontend %}
+      {%- if frontend.extra is string %}
+    {{ frontend.extra }}
+      {%- else %}
+    {%- for line in frontend.extra %}
+    {{ line }}
+    {%- endfor %}
+      {%- endif %}
     {%- endif %}
     {%- if 'default_backend' in frontend %}
     default_backend {{ frontend.default_backend }}
@@ -410,6 +491,11 @@ backend {{ backend.get('name', backend_name) }}
     {%- endif %}
     {%- if 'balance' in backend %}
     balance {{ backend.balance }}
+    {%- endif %}
+    {%- if 'timeouts' in backend %}
+      {%- for timeout in backend.timeouts %}
+    timeout {{ timeout }}
+      {%- endfor %}
     {%- endif %}
     {%- if 'options' in backend %}
       {%- if backend.options is string %}
@@ -441,6 +527,15 @@ backend {{ backend.get('name', backend_name) }}
       {%- else %}
         {%- for tcpresponse in backend.tcpresponses %}
     tcp-response {{ tcpresponse }}
+        {%- endfor %}
+      {%- endif %}
+    {%- endif %}
+    {%- if 'tcpchecks' in backend %}
+      {%- if backend.tcpchecks is string %}
+    tcp-check {{ backend.tcpchecks }}
+      {%- else %}
+        {%- for tcpcheck in backend.tcpchecks %}
+    tcp-check {{ tcpcheck }}
         {%- endfor %}
       {%- endif %}
     {%- endif %}
@@ -498,12 +593,21 @@ backend {{ backend.get('name', backend_name) }}
     {%- if 'reqreps' in backend %}
     {{- render_list_of_dictionaries('reqrep', backend.reqreps) }}
     {%- endif %}
+    {%- if 'extra' in backend %}
+      {%- if backend.extra is string %}
+    {{ backend.extra }}
+      {%- else %}
+    {%- for line in backend.extra %}
+    {{ line }}
+    {%- endfor %}
+      {%- endif %}
+    {%- endif %}
     {%- if 'defaultserver' in backend %}
     default-server {%- for option, value in backend.defaultserver|dictsort %} {{ ' '.join((option, value|string, '')) }} {%- endfor %}
     {%- endif %}
     {%- if 'servers' in backend %}
       {%- for server_name, server in backend.servers|dictsort %}
-    server {{ server.get('name', server_name) }} {{ server.host }}:{{ server.port }} {{ server.check }} {{ server.get('extra', '') }}
+    server {{ server.get('name', server_name) }} {{ server.host }}{% if 'port' in server %}:{{ server.port }}{% endif %} {{ server.get('check', '') }} {{ server.get('extra', '') }}
       {%- endfor %}
     {%- endif %}
   {% endfor %}

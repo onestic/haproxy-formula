@@ -1,10 +1,19 @@
+{% from tpldir ~ "/map.jinja" import haproxy with context %}
+
+{% set config_file = salt['pillar.get']('haproxy:config_file_path', haproxy.config_file) %}
 haproxy.config:
  file.managed:
-   - name: {{ salt['pillar.get']('haproxy:config_file_path', '/etc/haproxy/haproxy.cfg') }}
-   - source: salt://haproxy/templates/haproxy.jinja
+   - name: {{ config_file }}
+   - source: {{ haproxy.config_file_source }}
    - template: jinja
-   - user: root
-   - group: root
+   - user: {{ haproxy.user }}
+   - group: {{ haproxy.group }}
    - mode: 644
+   - require_in:
+     - service: haproxy.service
    - watch_in:
      - service: haproxy.service
+   {% if salt['pillar.get']('haproxy:overwrite', default=True) == False %}
+   - unless:
+     - test -e {{ config_file }}
+   {% endif %}
